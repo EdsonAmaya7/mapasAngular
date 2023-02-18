@@ -1,9 +1,10 @@
 import { Component, OnInit, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import * as mapboxgl from 'mapbox-gl'; // or "const mapboxgl = require('mapbox-gl');"
 
-interface MarcadorColor{
+interface MarcadorColor {
   color: string,
-  marker: mapboxgl.Marker
+  marker?: mapboxgl.Marker,
+  centro?: [number, number]
 }
 
 
@@ -64,14 +65,16 @@ export class MarcadoresComponent implements OnInit, AfterViewInit {
       .setLngLat(this.center)
       .addTo(this.mapa)
 
+    this.leerLocalStorage()
+
   }
 
-  irMarcador(marcador:MarcadorColor) {
-    const { marker }   = marcador
-    
-    console.log(marker.getLngLat())
+  irMarcador(marcador: MarcadorColor) {
+    const { marker } = marcador
 
-    // console.log(_lngLat)
+    this.mapa.flyTo({
+      center: marker!.getLngLat()
+    })
   }
 
   agregarMarcador() {
@@ -88,6 +91,68 @@ export class MarcadoresComponent implements OnInit, AfterViewInit {
       color,
       marker: nuevoMarcador
     })
+
+    this.guardarMarcadoresLocalStorage();
+
+    nuevoMarcador.on('dragend', () => {
+      this.guardarMarcadoresLocalStorage();
+    })
+  }
+
+  guardarMarcadoresLocalStorage() {
+
+    const lngLatArr: MarcadorColor[] = [];
+
+    this.marcadores.forEach(m => {
+      const color = m.color;
+      const { lng, lat } = m.marker!.getLngLat();
+
+      lngLatArr.push({
+        color,
+        centro: [lng, lat]
+      })
+
+    });
+
+    localStorage.setItem('marcadores', JSON.stringify(lngLatArr))
+  }
+
+  leerLocalStorage() {
+    if (!localStorage.getItem('marcadores')) {
+      return;
+    }
+
+    const lngLatArr: MarcadorColor[] = JSON.parse(localStorage.getItem('marcadores')!)
+
+    lngLatArr.forEach(m => {
+
+      const newMarker = new mapboxgl.Marker({
+        color: m.color,
+        draggable: true
+      })
+        .setLngLat(m.centro!)
+        .addTo(this.mapa)
+
+      this.marcadores.push({
+        marker: newMarker,
+        color: m.color
+      })
+
+      newMarker.on('dragend', () => {
+        this.guardarMarcadoresLocalStorage();
+      })
+
+    })
+
+  }
+
+  borrarMarcador(index: number){
+    // eliminar del mapa
+    this.marcadores[index].marker?.remove();
+    // eliminar del arreglo
+    this.marcadores.splice(index,1)
+    // actualizar el localstorage
+    this.guardarMarcadoresLocalStorage()
   }
 
 }
